@@ -35,5 +35,8 @@ MANIFEST
 # Large data files
 *.csv
 *.pth
+*.dbf
+*.prj
+*.shx
 *.txt
 *.shp
