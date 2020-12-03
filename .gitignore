@@ -1,0 +1,36 @@
+# Ignore contents of virtual environment
+venv/*
+
+# Ignore saved models
+checkpoints/*
+*.pth.tar
+
+# Cache
+__pycache__/
+
+# C extensions
+*.so
+
+# Distribution files
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+var/
+wheels/
+*.egg-info/
+*.egg
+MANIFEST
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Large data files
+*.csv
+*.pth
+*.txt
+*.shp
