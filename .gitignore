@@ -1,3 +1,6 @@
+# Mac OS
+.DS_Store
+
 # Ignore contents of virtual environment
 venv/*
 
