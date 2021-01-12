@@ -1,6 +1,8 @@
 """Python file containing external widgets used for the San Francisco Crime Exploration project.
 
 NOTE Documentation is not finished.
+NOTE Error in logic when new options are selected. Also need to figure out how to make the computation faster.
+NOTE Division by zero when the user unchecks everything and then clicks the plot button. Should perform a check so that this does not happen!
 """
 
 import os
@@ -63,7 +65,7 @@ def get_crime_dataframe(crimedata_path=None):
     """
     if crimedata_path is None:
         crimedata_path = "/Users/administrator/Documents/Projects/sf-crime-exploration/data/SFPD_Crime_Data_Full.csv"
-    dataframe = pd.read_csv(data_path)
+    dataframe = pd.read_csv(crimedata_path)
 
     return dataframe
 
@@ -83,7 +85,7 @@ def get_district_polygons(geodata):
 
     """
     polygons = {}
-    for index, entry in geoframe.iterrows():
+    for index, entry in geodata.iterrows():
         if entry.district not in polygons.keys():
             polygons[entry.district] = []
         polygons[entry.district].append(entry.geometry)
@@ -248,6 +250,7 @@ class CategoryPlot(qw.QDialog):
         crime_data = get_crime_dataframe()
         self.crime_categories = list(crime_data["Category"].unique())
         self.district_categories = list(crime_data["Police District"].unique())
+        self.get_crimes_by_district(crime_data)
 
     def get_crimes_by_district(self, crime_data):
         """Returns a dictionary containing key-value pairs of districts and their associated distribution of crimes, stored in a dictionary.
@@ -262,8 +265,8 @@ class CategoryPlot(qw.QDialog):
         for district in self.district_categories:
             district_dataframe = crime_data[crime_data["Police District"] == district]
             crime_distribution = {}
-            for category in crime_categories:
-                crimes_distribution[category] = len(
+            for category in self.crime_categories:
+                crime_distribution[category] = len(
                     district_dataframe[district_dataframe["Category"] == category]
                 )
             self.crimes_by_district[district] = crime_distribution
@@ -352,10 +355,47 @@ class CategoryPlot(qw.QDialog):
         self.figure_groupbox.setLayout(group_layout)
 
     def plot_initial_figure(self):
-        self.update_figure()
+        self.plot_all_districts()
+
+    def plot_all_districts(self):
+        for district in self.district_polygons:
+            for polygon in self.district_polygons[district]:
+                self.axes.plot(*polygon.exterior.xy, linewidth=0.5, color="blue")
+        self.axes.set_xticks([])
+        self.axes.set_yticks([])
+        self.canvas.draw()
 
     def update_figure(self):
         self.clear_axes()
+        checked_categories = self.dropdown_box.currentData()
+
+        # Compute the weights for each of the districts, based on the chosen categories.
+        district_weights = {}
+        total_number_crimes = 0
+        for district in self.district_categories:
+            if district not in district_weights.keys():
+                district_weights[district] = 0
+            for category in checked_categories:
+                district_weights[district] += self.crimes_by_district[district][
+                    category
+                ]
+                total_number_crimes += self.crimes_by_district[district][category]
+
+        # Normalize them to get the weights.
+        for district in self.district_categories:
+            district_weights[district] /= total_number_crimes
+
+        # Plot all of the districts.
+        self.clear_axes()
+        for district in self.district_polygons:
+            for polygon in self.district_polygons[district]:
+                # self.axes.plot(*polygon.exterior.xy, color="blue", linewidth=0.5)
+                self.axes.fill(
+                    *polygon.exterior.xy, color="red", alpha=district_weights[district]
+                )
+        self.axes.set_xticks([])
+        self.axes.set_yticks([])
+        self.canvas.draw()
 
     def clear_checkbox(self):
         self.dropdown_box.clearData()
@@ -364,5 +404,4 @@ class CategoryPlot(qw.QDialog):
 
     def clear_axes(self):
         self.axes.clear()
-        self.set_xticks([])
-        self.set_yticks([])
+        self.plot_all_districts()
