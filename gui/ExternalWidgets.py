@@ -211,9 +211,9 @@ class CheckableComboBox(qw.QComboBox):
                 self.model().item(i).setCheckState(Qt.Unchecked)
 
 
-class DistrictPlot(qw.QDialog):
+class CategoryPlot(qw.QDialog):
     def __init__(self, *args, **kwargs):
-        super(DistrictPlot, self).__init__(*args, **kwargs)
+        super(CategoryPlot, self).__init__(*args, **kwargs)
 
         self.load_data()
 
@@ -241,12 +241,32 @@ class DistrictPlot(qw.QDialog):
 
         """
         # Load the geometric data.
-        if geodata_path is None:
-            geodata_path = "/Users/administrator/Documents/Projects/sf-crime-exploration/data/SFPD_District_Centroids.csv"
-        geoframe = pd.read_csv(geodata_path)
-        geoframe.geometry = geoframe.geometry.apply(shapely.wkt.loads)
-        geoframe.centroid = geoframe.centroid.apply(shapely.wkt.loads)
-        self.geoframe = gpd.GeoDataFrame()
+        geom_data = get_geometric_dataframe()
+        self.district_polygons = get_district_polygons(geom_data)
+
+        # Load the crime data.
+        crime_data = get_crime_dataframe()
+        self.crime_categories = list(crime_data["Category"].unique())
+        self.district_categories = list(crime_data["Police District"].unique())
+
+    def get_crimes_by_district(self, crime_data):
+        """Returns a dictionary containing key-value pairs of districts and their associated distribution of crimes, stored in a dictionary.
+        
+        Parameters
+        ----------
+        crime_data : pandas.DataFrame
+            A Pandas DataFrame containing the San Francisco Crime data.
+        
+        """
+        self.crimes_by_district = {}
+        for district in self.district_categories:
+            district_dataframe = crime_data[crime_data["Police District"] == district]
+            crime_distribution = {}
+            for category in crime_categories:
+                crimes_distribution[category] = len(
+                    district_dataframe[district_dataframe["Category"] == category]
+                )
+            self.crimes_by_district[district] = crime_distribution
 
     def setup_window(
         self,
@@ -296,9 +316,53 @@ class DistrictPlot(qw.QDialog):
 
         self.crime_label = qw.QLabel("Crime")
         self.dropdown_box = CheckableComboBox()
+        self.dropdown_box.addItems(self.crime_categories)
+
+        self.plot_button = qw.QPushButton("Plot")
+        self.plot_button.setMaximumWidth(80)
+        self.clear_button = qw.QPushButton("Clear")
+        self.clear_button.setMaximumWidth(80)
+
+        group_layout = qw.QVBoxLayout()
+
+        dropdown_layout = qw.QGridLayout()
+        dropdown_layout.addWidget(self.crime_label, 0, 0)
+        dropdown_layout.addWidget(self.dropdown_box, 0, 1)
+        dropdown_layout.setColumnStretch(1, 2)
+
+        button_layout = qw.QHBoxLayout()
+        button_layout.addStretch()
+        button_layout.addWidget(self.plot_button, 0, Qt.AlignRight)
+        button_layout.addWidget(self.clear_button, 0, Qt.AlignRight)
+
+        group_layout.addLayout(dropdown_layout)
+        group_layout.addSpacing(15)
+        group_layout.addLayout(button_layout)
+        self.dropdown_groupbox.setLayout(group_layout)
+
+        self.plot_button.clicked.connect(self.update_figure)
+        self.clear_button.clicked.connect(self.clear_checkbox)
 
     def create_figure_group(self):
-        pass
+        group_layout = qw.QVBoxLayout()
+        group_layout.addWidget(self.toolbar)
+        group_layout.addWidget(self.canvas)
+
+        self.figure_groupbox = qw.QGroupBox()
+        self.figure_groupbox.setLayout(group_layout)
 
     def plot_initial_figure(self):
-        pass
+        self.update_figure()
+
+    def update_figure(self):
+        self.clear_axes()
+
+    def clear_checkbox(self):
+        self.dropdown_box.clearData()
+        self.clear_axes()
+        self.canvas.draw()
+
+    def clear_axes(self):
+        self.axes.clear()
+        self.set_xticks([])
+        self.set_yticks([])
